@@ -1,4 +1,3 @@
-from email import message
 import os
 import base64
 import hashlib
@@ -6,6 +5,9 @@ import hmac
 import logging
 import datetime
 from flask import abort, jsonify
+from google.cloud import firestore
+import calculate_time
+import publish_message
 
 from linebot import (
     LineBotApi, WebhookParser
@@ -16,6 +18,8 @@ from linebot.exceptions import (
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage
 )
+
+from check_remind.calculate_time import calculate_time
 
 
 # フォーマットは
@@ -29,18 +33,19 @@ from linebot.models import (
 # message
 # ;
 
+
 def check_date(date):
     try:
         new_date = datetime.datetime.strptime(date, '%m/%d')
-        return new_date
+        return True
     except ValueError:
         return False
 
 
 def check_time(time):
     try:
-        new_time = datetime.datetime.strptime(time, '%H%M')
-        return new_time
+        new_time = datetime.datetime.strptime(time, '%H:%M')
+        return True
     except ValueError:
         return False
 
@@ -59,15 +64,9 @@ def check_format(text):
             new_dates = []
             new_times = []
             for date in dates:
-                if not check_date(date):
-                    return False
-                else:
-                    new_dates.append(check_date(date))
+                new_dates.append(date)
             for time in times:
-                if not check_time(time):
-                    return False
-                else:
-                    new_times.append(check_time(time))
+                new_times.append(time)
             dates_list.append(new_dates)
             times_list.append(new_times)
             messages.append(message)
@@ -82,6 +81,7 @@ def check_format(text):
 def main(request):
     channel_secret = os.environ.get('LINE_CHANNEL_SECRET')
     channel_access_token = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN')
+    db = firestore.Client()
 
     line_bot_api = LineBotApi(channel_access_token)
     parser = WebhookParser(channel_secret)
@@ -98,7 +98,7 @@ def main(request):
         events = parser.parse(body, signature)
     except InvalidSignatureError:
         return abort(405)
-    text = "no_message"
+
     for event in events:
         if not isinstance(event, MessageEvent):
             continue
@@ -113,7 +113,29 @@ def main(request):
                     TextSendMessage(text="フォーマットが間違っています")
                 )
             else:
-
+                second_until_the_times = calculate_time.calculate_time(
+                    check_format[0], check_format[1])
+                try:
+                    for second_until_the_time in second_until_the_times:
+                        message_id = db.collection(
+                            'line_reminder').document().id
+                        doc_ref = db.collection(
+                            'line_reminder').document(f'{message_id}')
+                        # firestoreにデータを送る
+                        doc_ref.set({"set_time": datetime.datetime.now(
+                        ), "second_until_the_time": second_until_the_time, "message": check_format[2], "raw_text": text, "remind": True})
+                        # トピックをパブリッシュする
+                        publish_message.publish_message(second_until_the_time)
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text="リマインドをセットしました")
+                    )
+                except Exception as e:
+                    print(e)
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text=f"リマインドのセットに失敗しました{e}")
+                    )
         else:
             pass
     return jsonify({"message": "ok"})
