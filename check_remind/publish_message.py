@@ -2,17 +2,18 @@ from google.cloud import pubsub_v1
 import secret_id
 import os
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './data-potential-365808-45ad793328a9.json'
+# os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './data-potential-365808-45ad793328a9.json'
 
 # TODO(developer)
 project_id = secret_id.project_id
 topic_id = secret_id.topic_id
 
 
-def publish_message(data_str):
+def publish_message(second, message_id):
     publisher = pubsub_v1.PublisherClient()
     topic_path = publisher.topic_path(project_id, topic_id)
     # Data must be a bytestring
+    data_str = second+","+message_id
     data = data_str.encode("utf-8")
     # Add two attributes, origin and username, to the message
     future = publisher.publish(

@@ -1,2 +1,8 @@
 flask
 line-bot-sdk
+google.cloud
+google-cloud-firestore
+google-cloud-pubsub
+flask
+python-dateutil
+pytz

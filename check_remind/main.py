@@ -19,8 +19,6 @@ from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage
 )
 
-from check_remind.calculate_time import calculate_time
-
 
 # フォーマットは
 # //set//
@@ -34,26 +32,26 @@ from check_remind.calculate_time import calculate_time
 # ;
 
 
-def check_date(date):
-    try:
-        new_date = datetime.datetime.strptime(date, '%m/%d')
-        return True
-    except ValueError:
-        return False
+# def check_date(date):
+#     try:
+#         new_date = datetime.datetime.strptime(date, '%m/%d')
+#         return True
+#     except ValueError:
+#         return False
 
 
-def check_time(time):
-    try:
-        new_time = datetime.datetime.strptime(time, '%H:%M')
-        return True
-    except ValueError:
-        return False
+# def check_time(time):
+#     try:
+#         new_time = datetime.datetime.strptime(time, '%H:%M')
+#         return True
+#     except ValueError:
+#         return False
 
 
 def check_format(text):
     try:
         text = text.splitlines()
-        queues = text.length/4
+        queues = int((len(text)-1)/4)
         dates_list = []
         times_list = []
         messages = []
@@ -107,25 +105,29 @@ def main(request):
 
         text = event.message.text
         if text.startswith("//set//"):  # テキストが//set//だったら処理を実行
-            if not check_format(text):
+            user_id = event.source.user_id if event.source.type == "user" else event.source.group_id if event.source.type == "group" else "unknown_id"
+            checked = check_format(text)
+            if not checked:
                 line_bot_api.reply_message(
                     event.reply_token,
                     TextSendMessage(text="フォーマットが間違っています")
                 )
             else:
-                second_until_the_times = calculate_time.calculate_time(
-                    check_format[0], check_format[1])
+                calculated_time = calculate_time.calculate_time(
+                    checked[0], checked[1], checked[2])
+                second_until_the_times = calculated_time[0]
                 try:
-                    for second_until_the_time in second_until_the_times:
+                    for index, second_until_the_time in enumerate(second_until_the_times):
                         message_id = db.collection(
                             'line_reminder').document().id
                         doc_ref = db.collection(
                             'line_reminder').document(f'{message_id}')
                         # firestoreにデータを送る
-                        doc_ref.set({"set_time": datetime.datetime.now(
-                        ), "second_until_the_time": second_until_the_time, "message": check_format[2], "raw_text": text, "remind": True})
+                        doc_ref.set({"set_date": datetime.datetime.now(
+                        ), "remind_date": calculated_time[1][index], "second_until_the_time": int(second_until_the_time), "message": calculated_time[2][index], "raw_text": text, "remind": True, "user_id": user_id})
                         # トピックをパブリッシュする
-                        publish_message.publish_message(second_until_the_time)
+                        publish_message.publish_message(
+                            str(int(second_until_the_time)), message_id)
                     line_bot_api.reply_message(
                         event.reply_token,
                         TextSendMessage(text="リマインドをセットしました")
