@@ -18,15 +18,19 @@ def get_info(message_id):
         return False
 
 
-def main(message):
+def main(request):
+    print(request)
+    request_json = request.get_json()
+    message_id = request_json["msg_id"]
     LINE_CHANNEL_ACCESS_TOKEN = secret_id.access_token
     line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-    if get_info(message):
-        user_id = get_info(message)[0]
+    info = get_info(message_id)
+    if info:
+        user_id = info[0]
 
-        messages = TextSendMessage(text=get_info(message)[1])
+        messages = TextSendMessage(text=info[1])
         line_bot_api.push_message(user_id, messages=messages)
     else:
         pass
-    db.collection('line_reminder').document(message).delete()
+    db.collection('line_reminder').document(message_id).delete()
     return {"message": "ok"}
