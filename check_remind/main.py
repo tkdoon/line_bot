@@ -130,15 +130,15 @@ def main(request):
                 db.collection("user_id").document(user_id).delete()
                 user_schedules = db.collection(
                     'line_reminder').where("user_id", "==", user_id).stream()
-                schedule_dict = {}
+                schedule_dict = {"index": {}, "set_time": {}}
                 text_message = ""
                 for index, schedule_info in enumerate(user_schedules):
                     remind_date = tz.localize(
                         datetime.datetime.strptime(schedule_info.to_dict(
                         )["remind_date"].strftime("%Y-%m-%d %H:%M"), "%Y-%m-%d %H:%M")+datetime.timedelta(hours=9))
                     message = schedule_info.to_dict()["message"]
-                    schedule_dict["index"] = {f"{index}": {
-                        "scheduled_date": f"{remind_date}", "message": message, "message_id": f"{schedule_info.id}"}}
+                    schedule_dict["index"][f"{index}"] = {
+                        "scheduled_date": f"{remind_date}", "message": message, "message_id": f"{schedule_info.id}"}
                     schedule_dict["set_time"] = datetime.datetime.now(tz)
                     text_message += f"\n{index} {remind_date}"
                 usr_ref = db.collection("user_id").document(user_id)
@@ -205,8 +205,8 @@ def main(request):
 #             )["remind_date"].strftime("%Y-%m-%d %H:%M"), "%Y-%m-%d %H:%M")+datetime.timedelta(hours=9))
 
 #         message = schedule_info.to_dict()["message"]
-#         schedule_dict["index"][f"{index}"] = {
-#             "scheduled_date": f"{remind_date}", "message": message, "message_id": f"{schedule_info.id}"}
+    # schedule_dict["index"][f"{index}"] = {
+    #     "scheduled_date": f"{remind_date}", "message": message, "message_id": f"{schedule_info.id}"}
 #         schedule_dict["set_time"] = datetime.datetime.now(tz)
 #         text_message += f"\n{index} {remind_date}"
 #     usr_ref = db.collection("user_id").document(user_id)
